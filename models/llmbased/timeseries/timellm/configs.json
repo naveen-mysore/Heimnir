@@ -1,0 +1,90 @@
+{
+  "llm": {
+    "llama_layers": {
+        "description": "The number of layers in the LLM",
+        "value": 32
+    },
+    "stride": {
+        "description": "The stride of the LLM",
+        "value": 8
+    },
+    "llm_dim": {
+        "description": "The number of features in the LLM",
+        "value": 4096
+    },
+    "n_heads": {
+        "description": "The number of heads in the LLM",
+        "value": 8
+    },
+    "d_llm": {
+        "description": "The number of features in the LLM",
+        "value": 4096
+    }
+  },
+  "model": {
+    "seq_len": {
+      "description": "The length of the input sequence",
+        "value": 512
+    },
+    "label_len": {
+        "description": "The length of the label sequence",
+        "value": 48
+    },
+    "pred_len": {
+        "description": "The length of the prediction sequence",
+        "value": 96
+    },
+    "enc_in": {
+        "description": "The number of input features",
+        "value": 7
+    },
+    "dec_in": {
+        "description": "The number of decoder input features",
+        "value": 7
+    },
+    "c_out": {
+        "description": "The number of output features",
+        "value": 7
+    },
+    "d_ff": {
+        "description": "The number of features in the feedforward network",
+        "value": 128
+    },
+    "d_model": {
+        "description": "The number of features in the model",
+        "value": 32
+    },
+    "patch_len": {
+        "description": "The length of the patch",
+        "value": 16
+    }
+  },
+  "learning": {
+    "batch_size": {
+        "description": "The number of samples in a batch",
+        "value": 24
+    },
+    "learning_rate": {
+        "description": "The learning rate of the model",
+        "value": 0.01
+    },
+    "train_epochs": {
+        "description": "The number of epochs to train the model",
+        "value": 1
+    },
+    "dropout": {
+        "description": "The dropout rate of the model",
+        "value": 0.1
+    }
+  },
+  "data": {
+    "features": {
+        "description": "The type of features used in the model",
+        "value": "M"
+    }
+  },
+  "task": {
+    "task_name": "long_term_forecast",
+    "description": "The Electricity Transformer Temperature (ETT) is a crucial indicator in the electric power long-term deployment."
+  }
+}
