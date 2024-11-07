@@ -29,22 +29,23 @@ class PromptGen(nn.Module):
         lags = calcute_lags(x_enc)
         trends = x_enc.diff(dim=1).sum(dim=1)
 
-        prompt = []
-        for b in range(x_enc.shape[0]):
-            min_values_str = str(min_values[b].tolist()[0])
-            max_values_str = str(max_values[b].tolist()[0])
-            median_values_str = str(medians[b].tolist()[0])
-            lags_values_str = str(lags[b].tolist())
-            prompt_ = (
+        prompts = []
+        # here batch is B*N( since N is 1 was us) this is batch
+        for _batch in range(x_enc.shape[0]):
+            min_values_str = str(min_values[_batch].tolist()[0])
+            max_values_str = str(max_values[_batch].tolist()[0])
+            median_values_str = str(medians[_batch].tolist()[0])
+            lags_values_str = str(lags[_batch].tolist())
+            prompt_for_one_sequence = (
                 f"<|start_prompt|>Dataset description: {description}"
                 f"Task description: forecast the next {str(pred_len)} steps given the previous {str(seq_len)} steps information; "
                 "Input statistics: "
                 f"min value {min_values_str}, "
                 f"max value {max_values_str}, "
                 f"median value {median_values_str}, "
-                f"the trend of input is {'upward' if trends[b] > 0 else 'downward'}, "
+                f"the trend of input is {'upward' if trends[_batch] > 0 else 'downward'}, "
                 f"top 5 lags are : {lags_values_str}<|<end_prompt>|>"
             )
-            prompt.append(prompt_)
-        return prompt
+            prompts.append(prompt_for_one_sequence)
+        return prompts
 

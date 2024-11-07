@@ -62,7 +62,7 @@
   "learning": {
     "batch_size": {
         "description": "The number of samples in a batch",
-        "value": 24
+        "value": 2
     },
     "learning_rate": {
         "description": "The learning rate of the model",

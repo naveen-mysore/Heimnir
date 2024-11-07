@@ -24,7 +24,7 @@ class Dataset_ETT_hour(Dataset):
         self.set_type = type_map[flag]
         self.df = df
         self.percent = percent
-        self.features = features
+        self.features = 'M'
         self.target = target
         self.scale = scale
         self.timeenc = timeenc
@@ -35,10 +35,13 @@ class Dataset_ETT_hour(Dataset):
 
         # Set the encoding input size based on the number of features
         self.enc_in = self.data_x.shape[-1]
-        self.tot_len = len(self.data_x) - self.seq_len - self.pred_len + 1
+        self.tot_len = len(self.data_x) - (self.seq_len + self.pred_len) + 1
 
     def __read_data__(self):
         df_raw = self.df
+
+        # drop colum 'ID'
+        df_raw.drop(['ID'], axis=1, inplace=True)
 
         hours_in_year = 24 * 30 * 12
         hours_in_four_months = 24 * 30 * 4
@@ -84,8 +87,10 @@ class Dataset_ETT_hour(Dataset):
         s_begin = index % self.tot_len
         s_end = s_begin + self.seq_len
 
-        r_begin = s_end - self.label_len
-        r_end = r_begin + self.label_len + self.pred_len
+        #r_begin = s_end - self.label_len
+        #r_end = r_begin + self.label_len + self.pred_len
+        r_begin = s_end
+        r_end = r_begin + self.pred_len
 
         seq_x = self.data_x[s_begin:s_end, feat_id:feat_id + 1]
         seq_y = self.data_y[r_begin:r_end, feat_id:feat_id + 1]

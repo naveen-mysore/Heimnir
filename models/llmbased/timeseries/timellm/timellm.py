@@ -1,8 +1,8 @@
 import torch
-import torch.nn as nn
 import os
 import json
 from tqdm import tqdm
+from torch import nn, optim
 
 from models.llmbased.backbones.llama import Llama
 from models.llmbased.timeseries.timellm.embeddings.patch_embeddings import PatchEmbedding
@@ -19,16 +19,20 @@ class TimeLLM(nn.Module):
         self.configs = self._load_configs()
         self.device = None
 
+        self.criterion = nn.MSELoss()
+
         self.backbone = None
         self.mapping_layer = None
 
         self.pred_len = self.configs['model']['pred_len']['value']
         self.seq_len = self.configs['model']['seq_len']['value']
+        self.label_len = self.configs['model']['label_len']['value']
         self.patch_len = self.configs['model']['patch_len']['value']
         self.stride = self.configs['llm']['stride']['value']
         self.n_heads = self.configs['llm']['n_heads']['value']
         self.d_ff = self.configs['model']['d_ff']['value']
         self.d_llm = self.configs['llm']['d_llm']['value']
+        self.features = self.configs['data']['features']['value']
 
         self.normalize_layers = Normalize(7, affine=False)
         self.patch_embedding = PatchEmbedding(32, self.patch_len, self.stride, 0.1)
@@ -39,8 +43,20 @@ class TimeLLM(nn.Module):
         self.train_epochs = self.configs['learning']['train_epochs']['value']
         self.train_loader = None
 
+        # Training configurations
+        self.criterion = nn.MSELoss()
+        self.learning_rate = self.configs['learning']['learning_rate']['value']
+        self.model_optim = optim.Adam(self.__get_trainable_params(), lr=self.learning_rate)
+
     def set_data(self, data_loader):
         self.train_loader = data_loader
+
+    def __get_trainable_params(self):
+        trainable_parameters = []
+        for p in self.parameters():
+            if p.requires_grad is True:
+                trainable_parameters.append(p)
+        return trainable_parameters
 
     def move_to_device(self, device):
         self.to(device)
@@ -59,6 +75,7 @@ class TimeLLM(nn.Module):
         return configs
 
     def __run_inference_on_llama(self, llama_enc_out, n_vars):
+        # last hidden state of the backbone ?
         dec_out = self.backbone(llama_enc_out)
         dec_out = dec_out[:, :, :self.d_ff]
 
@@ -78,25 +95,28 @@ class TimeLLM(nn.Module):
 
     def set_backbone_as_llama(self):
         self.backbone = Llama()
+        self.backbone.set_is_trainable(is_trainable=False)
         self.mapping_layer = MappingLayer(self.backbone.get_vocab_size())
 
     def _get_prompt_embeddings(self, x_enc):
         # Extract trends and information from input and Generate prompt and get embeddings
-        prompt = self.prmpt.generate_prompt(x_enc, self.configs["task"]["description"], self.pred_len, self.seq_len)
-        prompt_embeddings = self.prmpt.tokenize_prompt_and_get_prompt_embeddings(prompt,
+        prompts = self.prmpt.generate_prompt(x_enc, self.configs["task"]["description"], self.pred_len, self.seq_len)
+        prompt_embeddings = self.prmpt.tokenize_prompt_and_get_prompt_embeddings(prompts,
                                                                                  self.backbone.get_tokenizer(),
                                                                                  self.backbone.get_model(),
                                                                                  x_enc.device)
         return prompt_embeddings
 
-    def _get_source_embeddings(self):
-        word_embeddings = self.backbone.get_model().get_input_embeddings().weight
-        source_embeddings = self.mapping_layer(word_embeddings.permute(1, 0)).permute(1, 0)
-        print(f"source embeddings shape {source_embeddings.shape}")
-        return source_embeddings
+
 
     def _get_reprogramming_output(self, x):
-        source_embeddings = self._get_source_embeddings()
+        def _get_source_embeddings():
+            word_embeddings = self.backbone.get_model().get_input_embeddings().weight
+            _source_embeddings = self.mapping_layer(word_embeddings.permute(1, 0)).permute(1, 0)
+            print(f"source embeddings shape {_source_embeddings.shape}")
+            return _source_embeddings
+
+        source_embeddings = _get_source_embeddings()
         enc_out = self.reprogramming_layer(x, source_embeddings, source_embeddings)
         return enc_out
 
@@ -137,9 +157,20 @@ class TimeLLM(nn.Module):
                 print(batch_x.shape)
                 device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
                 batch_x = batch_x.to(device)
+                batch_y = batch_y.to(device)
+
+                # Zero the gradients
+                self.model_optim.zero_grad()
                 outputs = self.forward(batch_x)
-                print(outputs.shape)
-                outputs = outputs[:, -self.pred_len:, -1:]
-                print(outputs.shape)
-                if i == 1:
+
+                f_dim = -1 if self.features == 'MS' else 0
+                # [select all batches, select last pred_len values, select last feature or first feature]
+                outputs = outputs[:, -self.pred_len:, f_dim:]
+                batch_y = batch_y[:, -self.pred_len:, f_dim:]
+
+                loss = self.criterion(outputs, batch_y)
+                loss.backward()
+                self.model_optim.step()
+                print(f"loss {loss}")
+                if i == 100:
                     break

@@ -40,6 +40,8 @@ class PatchEmbedding(nn.Module):
         # Patching
         self.patch_len = patch_len
         self.stride = stride
+        # The padding layer was initialized as ReplicationPad1d((0, stride)),
+        # which means no padding at the beginning of the sequence and stride padding at the end.
         self.padding_patch_layer = ReplicationPad1d((0, stride))
 
         # Backbone, Input encoding: projection of feature vectors onto a d-dim vector space
@@ -54,10 +56,16 @@ class PatchEmbedding(nn.Module):
     def forward(self, x):
         # do patching
         x = x.permute(0, 2, 1).contiguous()
-        n_vars = x.shape[1]
-        x = self.padding_patch_layer(x)
-        x = x.unfold(dimension=-1, size=self.patch_len, step=self.stride)
-        x = torch.reshape(x, (x.shape[0] * x.shape[1], x.shape[2], x.shape[3]))
+        n_vars = x.shape[1] # features
+        x_pad = self.padding_patch_layer(x)
+        # This operation extracts sliding patches from the tensor along a specified dimension
+        # dimension=-1 specifies unfolding along the last dimension (the padded sequence length).
+        x_unfolded = x_pad.unfold(dimension=-1, size=self.patch_len, step=self.stride)
+        # shape will be (batch, n_vars, number_of_patches, patch_len)
+        # number of patches = (seq_len - patch_len) // stride +1
+        # +1 to account for last patch to be included
+        # Reshape the tensor to (batch * n_vars, number_of_patches, patch_len)
+        _x = torch.reshape(x_unfolded, (x_unfolded.shape[0] * x_unfolded.shape[1], x_unfolded.shape[2], x_unfolded.shape[3]))
         # Input encoding
-        x = self.value_embedding(x)
+        x = self.value_embedding(_x)
         return self.dropout(x), n_vars

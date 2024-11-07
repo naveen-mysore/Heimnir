@@ -21,7 +21,6 @@ class ReprogrammingLayer(nn.Module):
         H = self.n_heads
 
         target_embedding = self.query_projection(target_embedding).view(B, L, H, -1)
-
         source_embedding = self.key_projection(source_embedding).view(S, H, -1)
         value_embedding = self.value_projection(value_embedding).view(S, H, -1)
 
@@ -32,13 +31,18 @@ class ReprogrammingLayer(nn.Module):
         return self.out_projection(out)
 
     def reprogramming(self, target_embedding, source_embedding, value_embedding):
+        # scaled dot-product attention mechanism
         B, L, H, E = target_embedding.shape
 
-        scale = 1. / sqrt(E)
-
+        # Calculate the attention scores using Einstein summation notation
+        # blhe: target_embedding with shape [B, L, H, E]
+        # she: source_embedding with shape [S, H, E]
+        # bhls: scores with shape [B, H, L, S]
         scores = torch.einsum("blhe,she->bhls", target_embedding, source_embedding)
 
-        A = self.dropout(torch.softmax(scale * scores, dim=-1))
-        reprogramming_embedding = torch.einsum("bhls,she->blhe", A, value_embedding)
+        scale = 1. / sqrt(E)
+        attention_matrix = self.dropout(torch.softmax(scores * scale, dim=-1))
+
+        reprogramming_embedding = torch.einsum("bhls,she->blhe", attention_matrix, value_embedding)
 
         return reprogramming_embedding

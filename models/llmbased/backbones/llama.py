@@ -49,6 +49,10 @@ class Llama(nn.Module):
         self.tokenizer.pad_token = pad_token
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
+    def set_is_trainable(self, is_trainable=False):
+        for param in self.llm_model.parameters():
+            param.requires_grad = is_trainable
+
     def forward(self, embeddings):
         dec_out = self.llm_model(inputs_embeds=embeddings).last_hidden_state
         return dec_out
